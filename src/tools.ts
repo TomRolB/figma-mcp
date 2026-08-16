@@ -5,7 +5,7 @@ import type { FigmaClient } from "./figmaClient.js";
 import type { FigmaNode } from "./figmaTypes.js";
 import { runJqFilter } from "./jqQuery.js";
 import { collectPalette, findNode, findNodes, listFrames } from "./nodeTree.js";
-import { ensureImage, refreshCache } from "./refresh.js";
+import { cachedImagePath, refreshCache } from "./refresh.js";
 import {
   formatFrameList,
   formatNodeMatches,
@@ -75,12 +75,12 @@ const registerGetPalette = (server: McpServer, { cache }: Dependencies) =>
     },
   );
 
-const registerExportImage = (server: McpServer, { client, cache }: Dependencies) =>
+const registerExportImage = (server: McpServer, { cache }: Dependencies) =>
   server.tool(
     "figma_export_image",
-    "Get the local file path of a rendered PNG for a node. Served from cache when available (populated by figma_refresh_cache for frames); otherwise fetched once and cached.",
+    "Get the local file path of a rendered PNG for a node. Served from the local cache only, which figma_refresh_cache populates for top-level frames; this tool never calls Figma.",
     { fileKey: fileKeyField, nodeId: nodeIdField("Node id to render, e.g. '1:334'.") },
-    async ({ fileKey, nodeId }) => textResult(await ensureImage(client, cache, fileKey, nodeId)),
+    async ({ fileKey, nodeId }) => textResult(await cachedImagePath(cache, fileKey, nodeId)),
   );
 
 const MAX_FIND_RESULTS = 50;

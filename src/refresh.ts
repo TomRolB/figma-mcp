@@ -71,10 +71,11 @@ const saveImageIfPresent = async (
   return true;
 };
 
-// Fallback for exporting a node that wasn't part of the bulk frame-level export
-// (e.g. a nested node the agent wants a picture of specifically).
-export const ensureImage = async (
-  client: FigmaClient,
+// Deliberately cache-only: every image arrives through refreshCache's bulk export, which keeps
+// figma_refresh_cache the single operation able to spend Figma's REST quota. Widening the export
+// in downloadFrameImages is free (one getImages call covers any number of ids), so an on-demand
+// fetch here would buy nothing but an unpredictable quota drain.
+export const cachedImagePath = async (
   cache: FigmaCache,
   fileKey: string,
   nodeId: string,
@@ -82,10 +83,9 @@ export const ensureImage = async (
   if (await cache.hasImage(fileKey, nodeId)) {
     return cache.imagePath(fileKey, nodeId);
   }
-  const { images } = await client.getImages(fileKey, [nodeId]);
-  const url = images[nodeId];
-  if (!url) {
-    throw new Error(`Figma did not return an image for node ${nodeId}`);
-  }
-  return cache.writeImage(fileKey, nodeId, await client.downloadImage(url));
+  throw new Error(
+    `No cached PNG for node ${nodeId} in file ${fileKey}. figma_refresh_cache pre-exports ` +
+      `top-level frames only, so nested nodes have no image. Use a frame id, or re-run ` +
+      `figma_refresh_cache if the cache predates this node.`,
+  );
 };

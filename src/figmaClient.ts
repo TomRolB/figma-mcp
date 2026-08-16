@@ -29,12 +29,15 @@ const ensureOk = (response: Response, description: string): Response => {
   return response;
 };
 
+// Resolved per request rather than up front, so a cache-only install never needs a token at all.
+export type ApiTokenProvider = () => string;
+
 // fetchImpl is injected so the client is testable with a stub instead of a mock.
 export class FigmaClient {
-  private readonly apiToken: string;
+  private readonly apiToken: ApiTokenProvider;
   private readonly fetchImpl: FetchImpl;
 
-  constructor({ apiToken, fetchImpl = fetch }: { apiToken: string; fetchImpl?: FetchImpl }) {
+  constructor({ apiToken, fetchImpl = fetch }: { apiToken: ApiTokenProvider; fetchImpl?: FetchImpl }) {
     this.apiToken = apiToken;
     this.fetchImpl = fetchImpl;
   }
@@ -69,7 +72,7 @@ export class FigmaClient {
   }
 
   async #get(url: string, description: string): Promise<Response> {
-    const options = { headers: { "X-Figma-Token": this.apiToken } };
+    const options = { headers: { "X-Figma-Token": this.apiToken() } };
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
       const response = await this.fetchImpl(url, options);
       if (isMonthlyQuotaExhausted(response)) {
